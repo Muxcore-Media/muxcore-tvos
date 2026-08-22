@@ -1,0 +1,60 @@
+name: tvOS build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-package:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test MuxCoreAPI package
+        run: |
+          set -euo pipefail
+          cd Packages/MuxCoreAPI
+          swift test -v
+
+  tvos-app:
+    runs-on: macos-15
+    timeout-minutes: 30
+    needs: api-package
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for tvOS Simulator (unsigned)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project MuxCoreTV.xcodeproj \
+            -scheme MuxCoreTV \
+            -sdk appletvsimulator \
+            -destination 'platform=tvOS Simulator,name=Apple TV' \
+            -configuration Debug \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: DerivedData/Logs/Build/*.xcactivitylog
+          if-no-files-found: ignore
