@@ -17,23 +17,23 @@ struct SettingsView: View {
                 }
 
                 Section("Home") {
-                    Toggle("Continue watching", isOn: boolBinding { $0.home.showContinueWatching })
-                    Toggle("Favorites", isOn: boolBinding { $0.home.showFavorites })
-                    Toggle("Next up", isOn: boolBinding { $0.home.showNextUp })
-                    Toggle("Recent requests", isOn: boolBinding { $0.home.showRecentRequests })
+                    Toggle("Continue watching", isOn: boolBinding(\.home.showContinueWatching))
+                    Toggle("Favorites", isOn: boolBinding(\.home.showFavorites))
+                    Toggle("Next up", isOn: boolBinding(\.home.showNextUp))
+                    Toggle("Recent requests", isOn: boolBinding(\.home.showRecentRequests))
                 }
 
                 Section("Playback") {
-                    Toggle("Remember position", isOn: boolBinding { $0.playback.rememberPosition })
-                    Toggle("Autoplay next episode", isOn: boolBinding { $0.playback.autoplayNext })
+                    Toggle("Remember position", isOn: boolBinding(\.playback.rememberPosition))
+                    Toggle("Autoplay next episode", isOn: boolBinding(\.playback.autoplayNext))
                 }
 
                 Section("Subtitles") {
-                    Toggle("Enabled", isOn: boolBinding { $0.subtitles.enabled })
+                    Toggle("Enabled", isOn: boolBinding(\.subtitles.enabled))
                 }
 
                 Section("Display") {
-                    Toggle("Watched indicators", isOn: boolBinding { $0.display.showWatchedIndicators })
+                    Toggle("Watched indicators", isOn: boolBinding(\.display.showWatchedIndicators))
                 }
 
                 Section("About") {
