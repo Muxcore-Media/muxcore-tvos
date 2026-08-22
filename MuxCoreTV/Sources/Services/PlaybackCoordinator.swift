@@ -8,7 +8,7 @@ enum PlaybackCoordinator {
         guard let url = client.absoluteURL(for: resolved.streamURL) else {
             throw MuxCoreAPIError.invalidURL
         }
-        let start = userdata.prefs.playback.rememberPosition ? (userdata.getProgress(movie.id)?.positionSec ?? 0) : 0
+        let start = userdata.prefs.playback.rememberPosition ? (userdata.getProgress(id: movie.id)?.positionSec ?? 0) : 0
         return PlaybackItem(
             url: url,
             title: movie.title,
@@ -26,7 +26,7 @@ enum PlaybackCoordinator {
         guard let url = client.absoluteURL(for: resolved.streamURL) else {
             throw MuxCoreAPIError.invalidURL
         }
-        let start = userdata.prefs.playback.rememberPosition ? (userdata.getProgress(episode.id)?.positionSec ?? 0) : 0
+        let start = userdata.prefs.playback.rememberPosition ? (userdata.getProgress(id: episode.id)?.positionSec ?? 0) : 0
         let label = "S\(String(format: "%02d", episode.seasonNumber))E\(String(format: "%02d", episode.episodeNumber))"
         return PlaybackItem(
             url: url,

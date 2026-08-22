@@ -39,12 +39,12 @@ struct QueueView: View {
     }
 
     private func seededQueue() -> [QueueItem] {
-        let fromProgress = userdata.continueWatching(20).map {
+        let fromProgress = userdata.continueWatching(limit: 20).map {
             QueueItem(id: $0.id, kind: $0.kind, title: $0.title, href: $0.href, streamURL: $0.streamURL, posterURL: $0.posterURL)
         }
         let fromFav = userdata.listFavorites().prefix(20).map {
-            QueueItem(id: $0.id, kind: $0.kind, title: $0.title, href: $0.href, posterURL: $0.posterURL)
+            QueueItem(id: $0.id, kind: $0.kind, title: $0.title, href: $0.href, streamURL: nil, posterURL: $0.posterURL)
         }
-        return fromProgress + fromFav
+        return fromProgress + Array(fromFav)
     }
 }

@@ -55,7 +55,7 @@ struct MovieDetailView: View {
     }
 
     private func progressLabel(_ movie: Movie) -> String {
-        if let p = userdata.getProgress(movie.id), p.positionSec > 5, p.watched != true { return "Resume" }
+        if let p = userdata.getProgress(id: movie.id), p.positionSec > 5, p.watched != true { return "Resume" }
         return "Play"
     }
 

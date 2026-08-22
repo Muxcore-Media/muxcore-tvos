@@ -41,7 +41,7 @@ struct PlayerView: View {
     private func setup() async {
         let avPlayer = AVPlayer(url: item.url)
         if item.startPosition > 1 {
-            avPlayer.seek(to: CMTime(seconds: item.startPosition, preferredTimescale: 600))
+            await avPlayer.seek(to: CMTime(seconds: item.startPosition, preferredTimescale: 600))
         }
         player = avPlayer
         avPlayer.play()

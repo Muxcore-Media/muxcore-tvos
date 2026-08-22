@@ -184,7 +184,7 @@ public actor MuxCoreClient {
         return w.tracks
     }
 
-    public func absoluteURL(for path: String) -> URL? {
+    nonisolated public func absoluteURL(for path: String) -> URL? {
         if path.hasPrefix("http://") || path.hasPrefix("https://") { return URL(string: path) }
         if path.hasPrefix("/") { return URL(string: path, relativeTo: session.baseURL)?.absoluteURL }
         return URL(string: path, relativeTo: session.baseURL)?.absoluteURL
