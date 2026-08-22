@@ -1,0 +1,59 @@
+name: tvOS IPA
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ipa:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for device (unsigned)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project MuxCoreTV.xcodeproj \
+            -scheme MuxCoreTV \
+            -sdk appletvos \
+            -configuration Release \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP="$(find DerivedData -name 'MuxCoreTV.app' -path '*Release-appletvos*' -type d | head -1)"
+          if [ -z "$APP" ]; then
+            echo "MuxCoreTV.app not found in DerivedData"
+            find DerivedData -name '*.app' || true
+            exit 1
+          fi
+          rm -rf Payload MuxCoreTV-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qr MuxCoreTV-unsigned.ipa Payload
+          ls -lh MuxCoreTV-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuxCoreTV-ipa
+          path: MuxCoreTV-unsigned.ipa
+          if-no-files-found: error
