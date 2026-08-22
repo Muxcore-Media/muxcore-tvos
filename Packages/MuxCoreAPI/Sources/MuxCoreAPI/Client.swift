@@ -204,7 +204,7 @@ public actor MuxCoreClient {
         try await Self.putJSON(baseURL: session.baseURL, path: path, body: body, sessionToken: session.sessionToken, decoder: decoder)
     }
 
-    private static func getJSON<T: Decodable>(baseURL: URL, path: String, sessionToken: String?, decoder: JSONDecoder) async throws -> T {
+    private static func getJSON<T: Decodable>(baseURL: URL, path: String, sessionToken: String?, decoder: JSONDecoder = JSONDecoder()) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -215,7 +215,7 @@ public actor MuxCoreClient {
         catch { throw MuxCoreAPIError.decoding(error) }
     }
 
-    private static func postJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder) async throws -> T {
+    private static func postJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder()) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -229,7 +229,7 @@ public actor MuxCoreClient {
         catch { throw MuxCoreAPIError.decoding(error) }
     }
 
-    private static func putJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder) async throws -> T {
+    private static func putJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder()) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
