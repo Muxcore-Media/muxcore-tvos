@@ -7,7 +7,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            List {
                 Section("Account") {
                     if let session = appState.session {
                         LabeledContent("Signed in as", value: session.username)

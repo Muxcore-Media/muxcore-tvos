@@ -444,6 +444,30 @@ public struct ProgressEntry: Codable, Identifiable, Sendable {
         case streamURL = "stream_url"
         case positionSec, durationSec, updatedAt
     }
+
+    public init(
+        id: String,
+        kind: MediaKind,
+        title: String,
+        posterURL: String?,
+        href: String,
+        streamURL: String?,
+        positionSec: Double,
+        durationSec: Double,
+        updatedAt: String,
+        watched: Bool?
+    ) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.posterURL = posterURL
+        self.href = href
+        self.streamURL = streamURL
+        self.positionSec = positionSec
+        self.durationSec = durationSec
+        self.updatedAt = updatedAt
+        self.watched = watched
+    }
 }
 
 public struct FavoriteEntry: Codable, Identifiable, Sendable {
@@ -457,6 +481,15 @@ public struct FavoriteEntry: Codable, Identifiable, Sendable {
     enum CodingKeys: String, CodingKey {
         case id, kind, title, href, year
         case posterURL = "poster_url"
+    }
+
+    public init(id: String, kind: MediaKind, title: String, posterURL: String?, href: String, year: Int?) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.posterURL = posterURL
+        self.href = href
+        self.year = year
     }
 }
 
@@ -473,12 +506,27 @@ public struct QueueItem: Codable, Identifiable, Sendable {
         case streamURL = "stream_url"
         case posterURL = "poster_url"
     }
+
+    public init(id: String, kind: MediaKind, title: String, href: String, streamURL: String?, posterURL: String?) {
+        self.id = id
+        self.kind = kind
+        self.title = title
+        self.href = href
+        self.streamURL = streamURL
+        self.posterURL = posterURL
+    }
 }
 
 public struct Playlist: Codable, Identifiable, Sendable {
     public var id: String
     public var name: String
     public var itemIds: [String]
+
+    public init(id: String, name: String, itemIds: [String]) {
+        self.id = id
+        self.name = name
+        self.itemIds = itemIds
+    }
 }
 
 public struct UserPreferences: Codable, Sendable {
@@ -526,6 +574,20 @@ public struct UserdataBlob: Codable, Sendable {
     public var prefs: UserPreferences?
     public var playlists: [Playlist]?
     public var queue: [QueueItem]?
+
+    public init(
+        progress: [String: ProgressEntry]?,
+        favorites: [String: FavoriteEntry]?,
+        prefs: UserPreferences?,
+        playlists: [Playlist]?,
+        queue: [QueueItem]?
+    ) {
+        self.progress = progress
+        self.favorites = favorites
+        self.prefs = prefs
+        self.playlists = playlists
+        self.queue = queue
+    }
 }
 
 public struct RequestTitleResponse: Codable, Sendable {

@@ -138,7 +138,7 @@ final class UserdataStore: ObservableObject {
     }
 
     func resolveNextUp(fetchShow: (String) async throws -> TVShow, limit: Int = 12) async -> [NextUpEntry] {
-        let continueIDs = Set(continueWatching(100).map(\.id))
+        let continueIDs = Set(continueWatching(limit: 100).map(\.id))
         var out: [NextUpEntry] = []
         var seen = Set<String>()
         var cache: [String: TVShow] = [:]
