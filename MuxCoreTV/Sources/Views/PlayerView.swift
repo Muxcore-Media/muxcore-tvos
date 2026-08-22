@@ -103,5 +103,3 @@ struct PlayerView: View {
         player = nil
     }
 }
-
-extension PlaybackItem: Identifiable {}

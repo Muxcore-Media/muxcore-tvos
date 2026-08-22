@@ -1,3 +1,4 @@
+import MuxCoreAPI
 import SwiftUI
 
 struct SettingsView: View {

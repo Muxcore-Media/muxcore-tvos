@@ -1,5 +1,7 @@
 # MuxCore TV (Apple TV)
 
+[![tvOS build](https://github.com/Muxcore-Media/muxcore-tvos/actions/workflows/tvos-build.yml/badge.svg)](https://github.com/Muxcore-Media/muxcore-tvos/actions/workflows/tvos-build.yml)
+
 Native tvOS client for the MuxCore consumer stack — **feature parity** with `media-ui-app` against the same **mediauiprox** BFF (`https://mux.zem.systems`).
 
 ## Feature parity (vs media-ui-app)
