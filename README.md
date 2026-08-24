@@ -56,6 +56,8 @@ CI IPAs are **unsigned**. You cannot install them on a TV as-is — Apple requir
 
 Bundle ID: `systems.zem.muxcore.tv` (display name **MuxCore**). Minimum tvOS **17.0**.
 
+**Household validation:** see [`docs/HARDWARE-VALIDATION.md`](docs/HARDWARE-VALIDATION.md) for the physical Apple TV checklist.
+
 ### What is `Packages/MuxCoreAPI`?
 
 Not an app — a **Swift package** (shared library) used by the tvOS app:
