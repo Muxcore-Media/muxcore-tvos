@@ -22,19 +22,15 @@ For on-device validation:
 
 ## BFF smoke (no TV required)
 
-From any host with `curl` and a valid session cookie against mux.zem.systems:
-
 ```bash
-# Quick health + capabilities (anonymous)
-curl -sS -o /dev/null -w 'capabilities:%{http_code}\n' https://mux.zem.systems/api/capabilities
-
-# Authenticated walk — set MUX_SESSION from browser devtools after login
-export MUX_SESSION='mux_session=…'
-curl -sS -H "Cookie: $MUX_SESSION" https://mux.zem.systems/api/movies?limit=1 | head -c 200
-curl -sS -H "Cookie: $MUX_SESSION" https://mux.zem.systems/api/userdata/progress | head -c 200
+./scripts/bff-soak.sh
+# optional authenticated walk:
+MUX_TV_USER=you MUX_TV_PASS=secret ./scripts/bff-soak.sh
 ```
 
-Full BFF regression: `_mvp/scripts/smoke-vault-public.sh` and `mediauiprox` tests on vault.
+Anonymous: `/`, `/api/capabilities`, Quick Connect register. With credentials or `MUX_SESSION`, also walks `/api/movies`, `/api/tv`, `/api/userdata/progress`.
+
+Full edge smoke: `_mvp/scripts/smoke-vault-public.sh`.
 
 ## Checklist (physical Apple TV)
 
