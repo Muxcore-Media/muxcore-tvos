@@ -28,3 +28,5 @@ Mirror `media-ui-app/src/App.tsx` routes and `lib/nav-catalog.ts` visibility:
 ## Deploy
 
 Client-only repo path. BFF changes (`quickconnect`, `tv/login`, Bearer) require **mediauiprox** redeploy on vault per workspace `AGENTS.md`.
+
+Open household/product work (including physical Apple TV validation) lives in workspace [`MASTER-ROADMAP.md`](../MASTER-ROADMAP.md) and umbrella GitHub Issues. Do not add `ROADMAP.md` / `TASKS.md` in this repo. The parity list above is the client surface map, not a backlog.
