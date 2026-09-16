@@ -51,5 +51,5 @@ Full edge smoke: `_mvp/scripts/smoke-vault-public.sh`.
 ## Notes
 
 - Auth: `POST /api/tv/login` or Quick Connect; Bearer token stored in Keychain (`KeychainStore.swift`).
-- Parity reference: `media-ui-app` routes in `AGENTS.md`; API types in `Packages/MuxCoreAPI`.
+- Parity reference: `media-ui-app` routes in umbrella `docs/agents/media-ui-app.md`; API types in `Packages/MuxCoreAPI`.
 - Linux hosts cannot build the tvOS app; run `swift test` in `Packages/MuxCoreAPI` only.
