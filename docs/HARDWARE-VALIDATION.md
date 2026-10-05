@@ -11,7 +11,7 @@ Manual soak on a **physical Apple TV** against a live vault stack (`https://mux.
 
 ## Signed install (development)
 
-Origin Forgejo CI (`.forgejo/workflows/ci.yml`) runs `swift test` in `Packages/MuxCoreAPI` only. GitHub `tvos-ipa.yml` builds an **unsigned** device IPA — not installable without re-signing.
+GitHub Actions CI runs `swift test` in `Packages/MuxCoreAPI` only (`tvos-build.yml`). `tvos-ipa.yml` builds an **unsigned** device IPA — not installable without re-signing.
 
 For on-device validation:
 
