@@ -14,6 +14,14 @@ final class AppState: ObservableObject {
     private let sessionKey = "muxcore.session"
 
     init() {
+        userdata.onVerifiedIdentity = { [weak self] identity in
+            guard let self, var saved = self.session, saved.userID == identity.userID else { return }
+            saved.userdataIdentity = identity
+            self.session = saved
+            if let data = try? JSONEncoder().encode(saved) {
+                UserDefaults.standard.set(data, forKey: self.sessionKey)
+            }
+        }
         restoreSession()
     }
 
@@ -39,6 +47,7 @@ final class AppState: ObservableObject {
         session = nil
         client = nil
         capabilities = .defaults
+        capsLoading = false
         userdata.bind(client: nil)
         UserDefaults.standard.removeObject(forKey: sessionKey)
     }
@@ -53,8 +62,10 @@ final class AppState: ObservableObject {
     func refreshCapabilities() async {
         guard let client else { return }
         capsLoading = true
-        defer { capsLoading = false }
-        if let caps = try? await client.getCapabilities() {
+        defer {
+            if self.client === client { capsLoading = false }
+        }
+        if let caps = try? await client.getCapabilities(), self.client === client {
             capabilities = caps
         }
     }

@@ -8,53 +8,41 @@ final class UserdataStore: ObservableObject {
     @Published private(set) var prefs: UserPreferences = .defaults
     @Published private(set) var playlists: [Playlist] = []
     @Published private(set) var queue: [QueueItem] = []
-    @Published private(set) var serverAuthoritative = false
+    @Published private(set) var syncStatus: UserdataSyncStatus = .signedOut
+    @Published private(set) var hasPendingChanges = false
+    @Published private(set) var isSyncing = false
+    @Published private(set) var canSync = false
 
-    private let defaults = UserDefaults.standard
-    private var client: MuxCoreClient?
+    private let sync = UserdataSyncStore()
+    var onVerifiedIdentity: ((UserdataIdentity) -> Void)?
+
+    init() {
+        sync.onChange = { [weak self] in self?.refreshSnapshot() }
+        sync.onVerifiedIdentity = { [weak self] identity in self?.onVerifiedIdentity?(identity) }
+    }
 
     func bind(client: MuxCoreClient?) {
-        self.client = client
-        loadLocal()
+        sync.bind(session: client?.session, transport: client)
     }
 
-    func loadLocal() {
-        progress = decode([String: ProgressEntry].self, key: "muxcore.progress") ?? [:]
-        favorites = decode([String: FavoriteEntry].self, key: "muxcore.favorites") ?? [:]
-        prefs = decode(UserPreferences.self, key: "muxcore.prefs") ?? .defaults
-        playlists = decode([Playlist].self, key: "muxcore.playlists") ?? []
-        queue = decode([QueueItem].self, key: "muxcore.queue") ?? []
+    func pullFromServer() async { await sync.synchronize() }
+    func pushToServer() async { await sync.synchronize() }
+
+    private func refreshSnapshot() {
+        progress = sync.blob.progress ?? [:]
+        favorites = sync.blob.favorites ?? [:]
+        prefs = sync.blob.prefs ?? .defaults
+        playlists = sync.blob.playlists ?? []
+        queue = sync.blob.queue ?? []
+        syncStatus = sync.status
+        hasPendingChanges = sync.hasPendingChanges
+        isSyncing = sync.isSyncing
+        canSync = sync.canSync
     }
 
-    func pullFromServer() async {
-        guard let client else { return }
-        do {
-            let blob = try await client.getUserdata()
-            if let p = blob.progress { progress = mergeProgress(local: progress, server: p) }
-            if let f = blob.favorites { favorites = f }
-            if let pr = blob.prefs { prefs = pr }
-            if let pl = blob.playlists { playlists = pl }
-            if let q = blob.queue { queue = q }
-            serverAuthoritative = true
-            persistLocal()
-        } catch {
-            serverAuthoritative = false
-        }
-    }
-
-    func pushToServer() async {
-        guard let client else { return }
-        do {
-            let blob = UserdataBlob(progress: progress, favorites: favorites, prefs: prefs, playlists: playlists, queue: queue)
-            let merged = try await client.putUserdata(blob)
-            if let p = merged.progress { progress = p }
-            if let f = merged.favorites { favorites = f }
-            if let pr = merged.prefs { prefs = pr }
-            if let pl = merged.playlists { playlists = pl }
-            if let q = merged.queue { queue = q }
-            serverAuthoritative = true
-            persistLocal()
-        } catch { /* offline */ }
+    private func change(_ field: UserdataSyncStore.Field, _ update: (inout UserdataBlob) -> Void) {
+        sync.update(field, update)
+        Task { await sync.synchronize() }
     }
 
     func continueWatching(limit: Int = 24) -> [ProgressEntry] {
@@ -78,16 +66,13 @@ final class UserdataStore: ObservableObject {
 
     @discardableResult
     func toggleFavorite(_ entry: FavoriteEntry) -> Bool {
-        if favorites[entry.id] != nil {
-            favorites.removeValue(forKey: entry.id)
-            persistLocal()
-            Task { await pushToServer() }
-            return false
+        change(.favorites) { blob in
+            var next = blob.favorites ?? [:]
+            if next[entry.id] != nil { next.removeValue(forKey: entry.id) }
+            else { next[entry.id] = entry }
+            blob.favorites = next
         }
-        favorites[entry.id] = entry
-        persistLocal()
-        Task { await pushToServer() }
-        return true
+        return favorites[entry.id] != nil
     }
 
     func getProgress(id: String) -> ProgressEntry? { progress[id] }
@@ -99,42 +84,38 @@ final class UserdataStore: ObservableObject {
             next.watched = true
             next.positionSec = 0
         }
-        progress[next.id] = next
-        persistLocal()
-        Task { await pushToServer() }
+        if next.watched == true { next.positionSec = 0 }
+        change(.progress) { blob in
+            var entries = blob.progress ?? [:]
+            entries[next.id] = next
+            blob.progress = entries
+        }
     }
 
     func updatePreferences(_ patch: (inout UserPreferences) -> Void) {
         var next = prefs
         patch(&next)
-        prefs = next
-        persistLocal()
-        Task { await pushToServer() }
+        change(.prefs) { $0.prefs = next }
     }
 
     func saveQueue(_ items: [QueueItem]) {
-        queue = items
-        persistLocal()
-        Task { await pushToServer() }
+        change(.queue) { $0.queue = items }
     }
 
     func enqueue(_ item: QueueItem) {
-        queue.removeAll { $0.id == item.id }
-        queue.append(item)
-        saveQueue(queue)
+        var next = queue.filter { $0.id != item.id }
+        next.append(item)
+        saveQueue(next)
     }
 
     func dequeue(id: String) {
-        queue.removeAll { $0.id == id }
-        saveQueue(queue)
+        saveQueue(queue.filter { $0.id != id })
     }
 
     func clearQueue() { saveQueue([]) }
 
     func savePlaylists(_ items: [Playlist]) {
-        playlists = items
-        persistLocal()
-        Task { await pushToServer() }
+        change(.playlists) { $0.playlists = items }
     }
 
     func resolveNextUp(fetchShow: (String) async throws -> TVShow, limit: Int = 12) async -> [NextUpEntry] {
@@ -178,34 +159,6 @@ final class UserdataStore: ObservableObject {
             ))
         }
         return out
-    }
-
-    private func mergeProgress(local: [String: ProgressEntry], server: [String: ProgressEntry]) -> [String: ProgressEntry] {
-        var out = local
-        for (id, entry) in server {
-            if let cur = out[id], cur.updatedAt >= entry.updatedAt { continue }
-            out[id] = entry
-        }
-        return out
-    }
-
-    private func persistLocal() {
-        encode(progress, key: "muxcore.progress")
-        encode(favorites, key: "muxcore.favorites")
-        encode(prefs, key: "muxcore.prefs")
-        encode(playlists, key: "muxcore.playlists")
-        encode(queue, key: "muxcore.queue")
-    }
-
-    private func encode<T: Encodable>(_ value: T, key: String) {
-        if let data = try? JSONEncoder().encode(value) {
-            defaults.set(data, forKey: key)
-        }
-    }
-
-    private func decode<T: Decodable>(_: T.Type, key: String) -> T? {
-        guard let data = defaults.data(forKey: key) else { return nil }
-        return try? JSONDecoder().decode(T.self, from: data)
     }
 
     private func showID(from href: String) -> String? {

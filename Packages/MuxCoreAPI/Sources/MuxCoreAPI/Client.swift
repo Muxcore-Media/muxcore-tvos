@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public enum MuxCoreAPIError: Error, LocalizedError, Sendable {
     case invalidURL
@@ -21,21 +24,25 @@ public struct MuxCoreSession: Codable, Sendable {
     public let sessionToken: String
     public let username: String
     public let userID: String
+    public var userdataIdentity: UserdataIdentity?
 
-    public init(baseURL: URL, sessionToken: String, username: String, userID: String) {
+    public init(baseURL: URL, sessionToken: String, username: String, userID: String, userdataIdentity: UserdataIdentity? = nil) {
         self.baseURL = baseURL
         self.sessionToken = sessionToken
         self.username = username
         self.userID = userID
+        self.userdataIdentity = userdataIdentity
     }
 }
 
 public actor MuxCoreClient {
     public let session: MuxCoreSession
     private let decoder = JSONDecoder()
+    private let urlSession: URLSession
 
-    public init(session: MuxCoreSession) {
+    public init(session: MuxCoreSession, urlSession: URLSession = .shared) {
         self.session = session
+        self.urlSession = urlSession
     }
 
     public static func normalizeBaseURL(_ raw: String) -> URL? {
@@ -80,6 +87,10 @@ public actor MuxCoreClient {
 
     public func getUserdata() async throws -> UserdataBlob {
         try await getJSON(path: "/api/userdata")
+    }
+
+    public func getSessionIdentity() async throws -> UserdataIdentity {
+        try await getJSON(path: "/api/session")
     }
 
     public func putUserdata(_ blob: UserdataBlob) async throws -> UserdataBlob {
@@ -193,51 +204,54 @@ public actor MuxCoreClient {
     // MARK: HTTP
 
     private func getJSON<T: Decodable>(path: String) async throws -> T {
-        try await Self.getJSON(baseURL: session.baseURL, path: path, sessionToken: session.sessionToken, decoder: decoder)
+        try await Self.getJSON(baseURL: session.baseURL, path: path, sessionToken: session.sessionToken, decoder: decoder, urlSession: urlSession)
     }
 
     private func postJSON<T: Decodable, Body: Encodable>(path: String, body: Body) async throws -> T {
-        try await Self.postJSON(baseURL: session.baseURL, path: path, body: body, sessionToken: session.sessionToken, decoder: decoder)
+        try await Self.postJSON(baseURL: session.baseURL, path: path, body: body, sessionToken: session.sessionToken, decoder: decoder, urlSession: urlSession)
     }
 
     private func putJSON<T: Decodable, Body: Encodable>(path: String, body: Body) async throws -> T {
-        try await Self.putJSON(baseURL: session.baseURL, path: path, body: body, sessionToken: session.sessionToken, decoder: decoder)
+        try await Self.putJSON(baseURL: session.baseURL, path: path, body: body, sessionToken: session.sessionToken, decoder: decoder, urlSession: urlSession)
     }
 
-    private static func getJSON<T: Decodable>(baseURL: URL, path: String, sessionToken: String?, decoder: JSONDecoder = JSONDecoder()) async throws -> T {
+    private static func getJSON<T: Decodable>(baseURL: URL, path: String, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = .shared) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         applyAuth(&request, token: sessionToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         try validate(response: response, data: data)
         do { return try decoder.decode(T.self, from: data) }
         catch { throw MuxCoreAPIError.decoding(error) }
     }
 
-    private static func postJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder()) async throws -> T {
+    private static func postJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = .shared) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder().encode(body)
         applyAuth(&request, token: sessionToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         try validate(response: response, data: data)
         do { return try decoder.decode(T.self, from: data) }
         catch { throw MuxCoreAPIError.decoding(error) }
     }
 
-    private static func putJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder()) async throws -> T {
+    private static func putJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = .shared) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
+        request.httpShouldHandleCookies = false
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder().encode(body)
         applyAuth(&request, token: sessionToken)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await urlSession.data(for: request)
         try validate(response: response, data: data)
         do { return try decoder.decode(T.self, from: data) }
         catch { throw MuxCoreAPIError.decoding(error) }

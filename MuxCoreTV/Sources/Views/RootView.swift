@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -13,11 +14,24 @@ struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await appState.userdata.pullFromServer() }
+            }
+        }
     }
 }
 
 struct MainShellView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var userdata: UserdataStore
+
+    private var syncNotice: String? {
+        switch userdata.syncStatus {
+        case .failed, .unavailable: return userdata.syncStatus.message + " Open Settings for data sync."
+        default: return nil
+        }
+    }
 
     private var primary: [NavDestination] {
         NavCatalog.primaryDestinations(caps: appState.capabilities)
@@ -36,6 +50,15 @@ struct MainShellView: View {
             if !overflow.isEmpty {
                 MoreView(destinations: overflow)
                     .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let syncNotice {
+                Text(syncNotice)
+                    .font(.footnote)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(.regularMaterial)
             }
         }
     }
