@@ -3,6 +3,27 @@ import Foundation
 import FoundationNetworking
 #endif
 
+private final class RejectAPIRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
+}
+
+private enum BFFTransport {
+    static let session = make(configuration: .ephemeral)
+
+    static func make(configuration supplied: URLSessionConfiguration) -> URLSession {
+        let configuration = supplied.copy() as! URLSessionConfiguration
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
+        return URLSession(configuration: configuration, delegate: RejectAPIRedirects(), delegateQueue: nil)
+    }
+}
+
 public enum MuxCoreAPIError: Error, LocalizedError, Sendable {
     case invalidURL
     case unauthorized
@@ -40,9 +61,9 @@ public actor MuxCoreClient {
     private let decoder = JSONDecoder()
     private let urlSession: URLSession
 
-    public init(session: MuxCoreSession, urlSession: URLSession = .shared) {
+    public init(session: MuxCoreSession, configuration: URLSessionConfiguration? = nil) {
         self.session = session
-        self.urlSession = urlSession
+        self.urlSession = configuration.map { BFFTransport.make(configuration: $0) } ?? BFFTransport.session
     }
 
     public static func normalizeBaseURL(_ raw: String) -> URL? {
@@ -215,7 +236,7 @@ public actor MuxCoreClient {
         try await Self.putJSON(baseURL: session.baseURL, path: path, body: body, sessionToken: session.sessionToken, decoder: decoder, urlSession: urlSession)
     }
 
-    private static func getJSON<T: Decodable>(baseURL: URL, path: String, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = .shared) async throws -> T {
+    private static func getJSON<T: Decodable>(baseURL: URL, path: String, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = BFFTransport.session) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false
@@ -227,7 +248,7 @@ public actor MuxCoreClient {
         catch { throw MuxCoreAPIError.decoding(error) }
     }
 
-    private static func postJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = .shared) async throws -> T {
+    private static func postJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = BFFTransport.session) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false
@@ -242,7 +263,7 @@ public actor MuxCoreClient {
         catch { throw MuxCoreAPIError.decoding(error) }
     }
 
-    private static func putJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = .shared) async throws -> T {
+    private static func putJSON<T: Decodable, Body: Encodable>(baseURL: URL, path: String, body: Body, sessionToken: String?, decoder: JSONDecoder = JSONDecoder(), urlSession: URLSession = BFFTransport.session) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw MuxCoreAPIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpShouldHandleCookies = false

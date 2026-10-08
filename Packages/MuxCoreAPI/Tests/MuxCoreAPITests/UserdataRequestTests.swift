@@ -38,7 +38,7 @@ final class UserdataRequestTests: XCTestCase {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [FixtureURLProtocol.self]
         let session = MuxCoreSession(baseURL: URL(string: "https://fixture.invalid")!, sessionToken: "fixture-bff-token", username: "alice", userID: "alice")
-        return MuxCoreClient(session: session, urlSession: URLSession(configuration: configuration))
+        return MuxCoreClient(session: session, configuration: configuration)
     }
 
     func testSessionAndUserdataRequestsUseBFFBearerWithoutCookiesOrPrincipalOverrides() async throws {
