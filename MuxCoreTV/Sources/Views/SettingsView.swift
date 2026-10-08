@@ -16,6 +16,19 @@ struct SettingsView: View {
                     Button("Sign Out", role: .destructive) { appState.signOut() }
                 }
 
+                Section("Data sync") {
+                    Text(userdata.syncStatus.message)
+                    if userdata.hasPendingChanges {
+                        Text("Some changes are still pending on this Apple TV.")
+                    }
+                    Button(userdata.hasPendingChanges ? "Retry Sync" : "Refresh Data") {
+                        Task { await userdata.pushToServer() }
+                    }
+                    .disabled(userdata.isSyncing || !userdata.canSync)
+                    Text("Server acknowledgement does not confirm cross-device storage. Quick Connect sessions may use server-local storage.")
+                        .font(.footnote)
+                }
+
                 Section("Home") {
                     Toggle("Continue watching", isOn: boolBinding(\.home.showContinueWatching))
                     Toggle("Favorites", isOn: boolBinding(\.home.showFavorites))

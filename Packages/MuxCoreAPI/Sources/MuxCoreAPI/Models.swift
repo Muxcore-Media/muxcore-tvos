@@ -426,7 +426,7 @@ public enum MediaKind: String, Codable, Sendable {
     case movie, tv, episode, music, book, other
 }
 
-public struct ProgressEntry: Codable, Identifiable, Sendable {
+public struct ProgressEntry: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var kind: MediaKind
     public var title: String
@@ -470,7 +470,7 @@ public struct ProgressEntry: Codable, Identifiable, Sendable {
     }
 }
 
-public struct FavoriteEntry: Codable, Identifiable, Sendable {
+public struct FavoriteEntry: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var kind: MediaKind
     public var title: String
@@ -493,7 +493,7 @@ public struct FavoriteEntry: Codable, Identifiable, Sendable {
     }
 }
 
-public struct QueueItem: Codable, Identifiable, Sendable {
+public struct QueueItem: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var kind: MediaKind
     public var title: String
@@ -517,7 +517,7 @@ public struct QueueItem: Codable, Identifiable, Sendable {
     }
 }
 
-public struct Playlist: Codable, Identifiable, Sendable {
+public struct Playlist: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var name: String
     public var itemIds: [String]
@@ -529,27 +529,27 @@ public struct Playlist: Codable, Identifiable, Sendable {
     }
 }
 
-public struct UserPreferences: Codable, Sendable {
-    public struct DisplayPrefs: Codable, Sendable {
+public struct UserPreferences: Codable, Equatable, Sendable {
+    public struct DisplayPrefs: Codable, Equatable, Sendable {
         public var theme: String
         public var libraryPageSize: Int
         public var showWatchedIndicators: Bool
     }
 
-    public struct HomePrefs: Codable, Sendable {
+    public struct HomePrefs: Codable, Equatable, Sendable {
         public var showContinueWatching: Bool
         public var showFavorites: Bool
         public var showRecentRequests: Bool
         public var showNextUp: Bool
     }
 
-    public struct PlaybackPrefs: Codable, Sendable {
+    public struct PlaybackPrefs: Codable, Equatable, Sendable {
         public var autoplayNext: Bool
         public var rememberPosition: Bool
         public var skipIntroSec: Int
     }
 
-    public struct SubtitlePrefs: Codable, Sendable {
+    public struct SubtitlePrefs: Codable, Equatable, Sendable {
         public var enabled: Bool
         public var language: String
         public var textSize: String
@@ -559,6 +559,75 @@ public struct UserPreferences: Codable, Sendable {
     public var home: HomePrefs
     public var playback: PlaybackPrefs
     public var subtitles: SubtitlePrefs
+    // Retain fields owned by other clients when the BFF replaces the preferences object.
+    private var rawDocument: [String: PreferenceJSON] = [:]
+
+    public init(display: DisplayPrefs, home: HomePrefs, playback: PlaybackPrefs, subtitles: SubtitlePrefs) {
+        self.display = display
+        self.home = home
+        self.playback = playback
+        self.subtitles = subtitles
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try [String: PreferenceJSON](from: decoder)
+        let defaults = try Self.defaults.knownDocument()
+        let complete = PreferenceJSON.merging(defaults, raw)
+        let values = try JSONDecoder().decode(Values.self, from: JSONEncoder().encode(complete))
+        self.init(display: values.display, home: values.home, playback: values.playback, subtitles: values.subtitles)
+        rawDocument = raw
+    }
+
+    public func encode(to encoder: Encoder) throws { try document().encode(to: encoder) }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        (try? lhs.document()) == (try? rhs.document())
+    }
+
+    func changedPaths(from previous: Self) throws -> Set<String> {
+        let before = try previous.knownDocument()
+        let after = try knownDocument()
+        var paths = Set<String>()
+        for (section, value) in after {
+            guard case let .object(fields) = value else { continue }
+            let old: [String: PreferenceJSON]
+            if case let .object(fields) = before[section] { old = fields } else { old = [:] }
+            for (key, value) in fields where old[key] != value { paths.insert(section + "." + key) }
+        }
+        return paths
+    }
+
+    func applying(_ local: Self, paths: Set<String>) throws -> Self {
+        var combined = try document()
+        let source = try local.knownDocument()
+        for path in paths {
+            let parts = path.split(separator: ".", maxSplits: 1).map(String.init)
+            guard parts.count == 2, case let .object(localFields) = source[parts[0]],
+                  let value = localFields[parts[1]] else { continue }
+            var fields: [String: PreferenceJSON] = [:]
+            if case let .object(current) = combined[parts[0]] { fields = current }
+            fields[parts[1]] = value
+            combined[parts[0]] = .object(fields)
+        }
+        return try JSONDecoder().decode(Self.self, from: JSONEncoder().encode(combined))
+    }
+
+    private struct Values: Codable {
+        var display: DisplayPrefs
+        var home: HomePrefs
+        var playback: PlaybackPrefs
+        var subtitles: SubtitlePrefs
+    }
+
+    private func knownDocument() throws -> [String: PreferenceJSON] {
+        try JSONDecoder().decode([String: PreferenceJSON].self, from: JSONEncoder().encode(
+            Values(display: display, home: home, playback: playback, subtitles: subtitles)
+        ))
+    }
+
+    private func document() throws -> [String: PreferenceJSON] {
+        try PreferenceJSON.merging(rawDocument, knownDocument())
+    }
 
     public static let defaults = UserPreferences(
         display: .init(theme: "dark", libraryPageSize: 48, showWatchedIndicators: true),
@@ -568,25 +637,73 @@ public struct UserPreferences: Codable, Sendable {
     )
 }
 
+private enum PreferenceJSON: Codable, Equatable, Sendable {
+    case object([String: PreferenceJSON]), array([PreferenceJSON]), string(String), number(Decimal), bool(Bool), null
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer()
+        if value.decodeNil() { self = .null }
+        else if let bool = try? value.decode(Bool.self) { self = .bool(bool) }
+        else if let string = try? value.decode(String.self) { self = .string(string) }
+        else if let number = try? value.decode(Decimal.self) { self = .number(number) }
+        else if let array = try? value.decode([PreferenceJSON].self) { self = .array(array) }
+        else { self = .object(try value.decode([String: PreferenceJSON].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer()
+        switch self {
+        case let .object(object): try value.encode(object)
+        case let .array(array): try value.encode(array)
+        case let .string(string): try value.encode(string)
+        case let .number(number): try value.encode(number)
+        case let .bool(bool): try value.encode(bool)
+        case .null: try value.encodeNil()
+        }
+    }
+
+    static func merging(_ base: [String: Self], _ overlay: [String: Self]) -> [String: Self] {
+        var result = base
+        for (key, value) in overlay {
+            if case let .object(old) = result[key], case let .object(new) = value {
+                result[key] = .object(merging(old, new))
+            } else { result[key] = value }
+        }
+        return result
+    }
+}
+
 public struct UserdataBlob: Codable, Sendable {
     public var progress: [String: ProgressEntry]?
     public var favorites: [String: FavoriteEntry]?
     public var prefs: UserPreferences?
     public var playlists: [Playlist]?
     public var queue: [QueueItem]?
+    public var userID: String?
+    public var tenantID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case progress, favorites, prefs, playlists, queue
+        case userID = "user_id"
+        case tenantID = "tenant_id"
+    }
 
     public init(
         progress: [String: ProgressEntry]?,
         favorites: [String: FavoriteEntry]?,
         prefs: UserPreferences?,
         playlists: [Playlist]?,
-        queue: [QueueItem]?
+        queue: [QueueItem]?,
+        userID: String? = nil,
+        tenantID: String? = nil
     ) {
         self.progress = progress
         self.favorites = favorites
         self.prefs = prefs
         self.playlists = playlists
         self.queue = queue
+        self.userID = userID
+        self.tenantID = tenantID
     }
 }
 
